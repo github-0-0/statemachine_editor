@@ -1,697 +1,368 @@
 
-class DiagramEditor {
-	static SCALE = 20;
-
-	constructor(board, svg) {
-		this.board = board;
-		this.svg = svg;
-
-		this.nodes = new Set();
-		this.arrows = new Set();
-
-		this.stateNames = new Set();
-		this.triggerNames = new Set();
-
-		this.activeArrow = null;
-		this.selectedArrow = null;
-		this.dragSession = null;
-
-		this.bindBoardEvents();
-		this.bindEditableText();
-	}
-
-	// --------------------------------------------------
-	// Initialization
-	// --------------------------------------------------
-
-	bindBoardEvents() {
-		this.board.addEventListener("mousemove", (e) => {
-			this.onBoardMouseMove(e);
-		});
-
-		this.board.addEventListener("contextmenu", (e) => {
-			this.onBoardContextMenu(e);
-		});
-
-		this.board.addEventListener("pointerdown", (e) => {
-			this.onBoardPointerDown(e);
-		});
-
-		document.addEventListener("keydown", (e) => {
-			this.onKeyDown(e);
-		});
-	}
-
-	bindEditableText() {
-		document.querySelectorAll(".editable-text").forEach((element) => {
-			element.addEventListener("contextmenu", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-
-				element.setAttribute("contenteditable", "");
-				element.focus();
-			});
-		});
-	}
-
-	// --------------------------------------------------
-	// Node creation
-	// --------------------------------------------------
-
-	insertState() {
-		const name = this.uniqueName("ExampleState", this.stateNames);
-		const state = new StateNode(this, name);
-
-		this.nodes.add(state);
-		return state;
-	}
-
-	insertTrigger() {
-		const name = this.uniqueName("ExampleTrigger", this.triggerNames);
-		const trigger = new TriggerNode(this, name);
-
-		this.nodes.add(trigger);
-		return trigger;
-	}
-
-	uniqueName(base, names) {
-		let name = base;
-		let index = 1;
-
-		while (names.has(name)) {
-			name = `${base} (${index++})`;
-		}
-
-		names.add(name);
-		return name;
-	}
-
-	randomPosition() {
-		const randomCoordinate = () =>
-			Math.round(Math.random() * 100 / DiagramEditor.SCALE)
-				* DiagramEditor.SCALE;
-
-		return [randomCoordinate(), randomCoordinate()];
-	}
-
-	snap(value) {
-		return Math.round(value / DiagramEditor.SCALE)
-			* DiagramEditor.SCALE;
-	}
-
-	// --------------------------------------------------
-	// Node dragging
-	// --------------------------------------------------
-
-	beginNodeDrag(node, e) {
-		if (this.dragSession) return;
-
-		this.dragSession = {
-			node,
-			pointerId: e.pointerId,
-			startX: e.clientX,
-			startY: e.clientY,
-			startOffsetX: node.offsetX,
-			startOffsetY: node.offsetY,
-			lastX: e.clientX,
-			lastY: e.clientY,
-			distance: 0
-		};
-
-		node.element.setPointerCapture(e.pointerId);
-	}
-
-	moveNode(node, e) {
-		const session = this.dragSession;
-
-		if (!session) return;
-		if (session.node !== node) return;
-		if (session.pointerId !== e.pointerId) return;
-
-		session.distance += Math.hypot(
-			e.clientX - session.lastX,
-			e.clientY - session.lastY
-		);
-
-		session.lastX = e.clientX;
-		session.lastY = e.clientY;
-
-		// Ignore small pointer movements.
-		if (session.distance <= 3) return;
-
-		node.offsetX = this.snap(
-			session.startOffsetX + e.clientX - session.startX
-		);
-
-		node.offsetY = this.snap(
-			session.startOffsetY + e.clientY - session.startY
-		);
-
-		node.updatePosition();
-		this.updateAllArrows();
-	}
-
-	endNodeDrag(node, e) {
-		const session = this.dragSession;
-
-		if (!session) return;
-		if (session.node !== node) return;
-		if (session.pointerId !== e.pointerId) return;
-
-		this.dragSession = null;
-
-		if (node.element.hasPointerCapture(e.pointerId)) {
-			node.element.releasePointerCapture(e.pointerId);
-		}
-
-		// A pointer interaction that didn't become a drag is a click.
-		if (session.distance <= 3) {
-			this.activateNode(node);
-		}
-
-		this.updateAllArrows();
-	}
-
-	cancelNodeDrag(node, e) {
-		const session = this.dragSession;
-
-		if (!session) return;
-		if (session.node !== node) return;
-		if (session.pointerId !== e.pointerId) return;
-
-		this.dragSession = null;
-		this.updateAllArrows();
-	}
-
-	// --------------------------------------------------
-	// Arrow creation and connection
-	// --------------------------------------------------
-
-	activateNode(node) {
-		if (!this.activeArrow) {
-			this.activeArrow = new Arrow(this, node);
-			return;
-		}
-
-		// Only opposite node types can connect.
-		if (!this.activeArrow.fromNode.canConnectTo(node)) {
-			return;
-		}
-
-		this.activeArrow.complete(node);
-
-		this.arrows.add(this.activeArrow);
-		this.activeArrow = null;
-
-		this.updateAllArrows();
-	}
-
-	cancelActiveArrow() {
-		if (!this.activeArrow) return;
-
-		this.activeArrow.remove();
-		this.activeArrow = null;
-	}
-
-	addWaypoint(point) {
-		if (!this.activeArrow) return;
-
-		this.activeArrow.addWaypoint(point);
-	}
-
-	// --------------------------------------------------
-	// Arrow selection and deletion
-	// --------------------------------------------------
-
-	selectArrow(arrow) {
-		if (this.activeArrow) return;
-
-		this.selectedArrow?.group.classList.remove("selected");
-
-		this.selectedArrow = arrow;
-
-		this.selectedArrow?.group.classList.add("selected");
-	}
-
-	deleteSelectedArrow() {
-		if (!this.selectedArrow) return;
-
-		this.selectedArrow.remove();
-		this.arrows.delete(this.selectedArrow);
-		this.selectedArrow = null;
-	}
-
-	// --------------------------------------------------
-	// Board events
-	// --------------------------------------------------
-
-	onBoardMouseMove(e) {
-		if (!this.activeArrow) return;
-
-		const rect = this.board.getBoundingClientRect();
-
-		const point = [
-			this.snap(e.clientX - rect.left),
-			this.snap(e.clientY - rect.top)
-		];
-
-		this.activeArrow.setPreviewPoint(point);
-	}
-
-	onBoardContextMenu(e) {
-		e.preventDefault();
-
-		if (!this.activeArrow) return;
-
-		const rect = this.board.getBoundingClientRect();
-
-		const point = [
-			this.snap(e.clientX - rect.left),
-			this.snap(e.clientY - rect.top)
-		];
-
-		this.addWaypoint(point);
-	}
-
-	onBoardPointerDown(e) {
-		if (e.button !== 0) return;
-
-		// Interactions with nodes and arrows aren't empty-board clicks.
-		if (e.target.closest?.(".state, .trigger, .edge-group")) {
-			return;
-		}
-
-		this.cancelActiveArrow();
-		this.selectArrow(null);
-	}
-
-	onKeyDown(e) {
-		if (e.key === "Escape") {
-			this.cancelActiveArrow();
-			return;
-		}
-
-		if (e.key === "Delete" || e.key === "Backspace") {
-			this.deleteSelectedArrow();
-		}
-	}
-
-	// --------------------------------------------------
-	// Geometry
-	// --------------------------------------------------
-
-	getBottomCenter(node) {
-		const boardRect = this.board.getBoundingClientRect();
-		const rect = node.element.getBoundingClientRect();
-
-		return [
-			Math.round(rect.left - boardRect.left + rect.width / 2),
-			Math.round(rect.bottom - boardRect.top)
-		];
-	}
-
-	getNearestSideCenter(node, refPoint) {
-		const boardRect = this.board.getBoundingClientRect();
-		const rect = node.element.getBoundingClientRect();
-
-		const cx = Math.round(
-			rect.left - boardRect.left + rect.width / 2
-		);
-
-		const cy = Math.round(
-			rect.top - boardRect.top + rect.height / 2
-		);
-
-		const candidates = [
-			[cx, Math.round(rect.top - boardRect.top)],
-			[cx, Math.round(rect.bottom - boardRect.top)],
-			[Math.round(rect.left - boardRect.left), cy],
-			[Math.round(rect.right - boardRect.left), cy]
-		];
-
-		return candidates.reduce((best, point) => {
-			const distance = Math.hypot(
-				point[0] - refPoint[0],
-				point[1] - refPoint[1]
-			);
-
-			return distance < best.distance
-				? { point, distance }
-				: best;
-		}, {
-			point: candidates[0],
-			distance: Infinity
-		}).point;
-	}
-
-	getMidpoint(point1, point2) {
-		const dx = point2[0] - point1[0];
-		const dy = point2[1] - point1[1];
-
-		const absX = Math.abs(dx);
-		const absY = Math.abs(dy);
-
-		if (absX === 0 || absY === 0 || absX === absY) {
-			return null;
-		}
-
-		if (absX > absY) {
-			return [
-				point2[0] - absY * Math.sign(dx),
-				point1[1]
-			];
-		}
-
-		return [
-			point1[0],
-			point2[1] - absX * Math.sign(dy)
-		];
-	}
-
-	// --------------------------------------------------
-	// Rendering
-	// --------------------------------------------------
-
-	updateAllArrows() {
-		this.activeArrow?.render();
-
-		for (const arrow of this.arrows) {
-			arrow.render();
-		}
-	}
+const scale = 20;
+const board = document.getElementById('board');
+const svg = document.getElementById('edges');
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function snap(point) {
+    return [
+        Math.round(point[0] / scale) * scale,
+        Math.round(point[1] / scale) * scale
+    ];
 }
 
+const dragCallbacks = new WeakMap();
 
-// ==================================================
-// Diagram Node
-// ==================================================
+function makeDraggable(el, ondrag = (x, y) => {}) {
+    if (!el) return;
 
-class DiagramNode {
-	constructor(editor, name, kind, className) {
-		this.editor = editor;
-		this.name = name;
-		this.kind = kind;
+    if (dragCallbacks.has(el)) {
+        dragCallbacks.set(el, ondrag);
+        return;
+    }
 
-		this.offsetX = 0;
-		this.offsetY = 0;
+    dragCallbacks.set(el, ondrag);
+    let isDragging = false;
+    let hasMoved = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
 
-		this.element = document.createElement("div");
+    el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
 
-		this.element.className = className;
-		this.element.textContent = name;
+        e.stopPropagation();
+        isDragging = true;
+        hasMoved = false;
 
-		this.element.style.position = "absolute";
-		this.element.style.left = "";
-		this.element.style.top = "";
-		this.element.style.cursor = "grab";
-		this.element.style.userSelect = "none";
-		this.element.style.touchAction = "none";
-		this.element.style.zIndex = "2";
+        startX = e.clientX - currentX;
+        startY = e.clientY - currentY;
 
-		const [x, y] = editor.randomPosition();
+        el.style.cursor = 'grabbing';
+        el.setPointerCapture(e.pointerId);
+    });
 
-		this.element.style.left = `${x}px`;
-		this.element.style.top = `${y}px`;
+    el.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
 
-		editor.board.appendChild(this.element);
+        const nextX = e.clientX - startX;
+        const nextY = e.clientY - startY;
+        el.dataset.dragging = "false";
 
-		this.bindEvents();
-	}
+        if (Math.abs(nextX - currentX) > 3 || Math.abs(nextY - currentY) > 3) {
+            hasMoved = true;
+            el.dataset.dragging = "true";
+        }
 
-	bindEvents() {
-		this.element.addEventListener("pointerdown", (e) => {
-			this.onPointerDown(e);
-		});
+        currentX = nextX;
+        currentY = nextY;
 
-		this.element.addEventListener("pointermove", (e) => {
-			this.onPointerMove(e);
-		});
+        const [x, y] = snap([currentX, currentY]);
 
-		this.element.addEventListener("pointerup", (e) => {
-			this.onPointerUp(e);
-		});
+        el.style.transform = `translate(${x}px, ${y}px)`;
+        dragCallbacks.get(el)?.(x, y);
+    });
 
-		this.element.addEventListener("pointercancel", (e) => {
-			this.onPointerCancel(e);
-		});
-	}
+    const stopDrag = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        el.dataset.wasDragged = hasMoved ? "true" : "false";
+        el.style.cursor = 'grab';
 
-	onPointerDown(e) {
-		if (e.button !== 0) return;
+        el.dataset.dragging = "false";
+        if (el.hasPointerCapture(e.pointerId)) {
+            el.releasePointerCapture(e.pointerId);
+        }
+    };
 
-		e.preventDefault();
-		e.stopPropagation();
-
-		this.element.style.cursor = "grabbing";
-		this.editor.beginNodeDrag(this, e);
-	}
-
-	onPointerMove(e) {
-		this.editor.moveNode(this, e);
-	}
-
-	onPointerUp(e) {
-		this.element.style.cursor = "grab";
-		this.editor.endNodeDrag(this, e);
-	}
-
-	onPointerCancel(e) {
-		this.element.style.cursor = "grab";
-		this.editor.cancelNodeDrag(this, e);
-	}
-
-	updatePosition() {
-		this.element.style.transform =
-			`translate(${this.offsetX}px, ${this.offsetY}px)`;
-	}
-
-	canConnectTo(node) {
-		return node instanceof DiagramNode && this.kind !== node.kind;
-	}
+    el.addEventListener('pointerup', stopDrag);
+    el.addEventListener('pointercancel', stopDrag);
 }
-
-
-// ==================================================
-// State
-// ==================================================
-
-class StateNode extends DiagramNode {
-	constructor(editor, name) {
-		super(editor, name, "state", "state states");
-	}
-}
-
-
-// ==================================================
-// Trigger
-// ==================================================
-
-class TriggerNode extends DiagramNode {
-	constructor(editor, name) {
-		super(editor, name, "trigger", "trigger triggers");
-	}
-}
-
-
-// ==================================================
-// Arrow
-// ==================================================
 
 class Arrow {
-	static SVG_NS = "http://www.w3.org/2000/svg";
+    constructor(elementStart, waypoints = [], elementEnd) {
+        this.elementStart = elementStart;
+        this.waypoints = [];
+        this.elementEnd = elementEnd;
+        this.dragElements = [];
+        this.group = null;
+        this.hitPath = null;
+        this.visiblePath = null;
 
-	constructor(editor, fromNode) {
-		this.editor = editor;
-		this.fromNode = fromNode;
-		this.toNode = null;
+        for (const wp of waypoints) {
+            this.addWaypoint(wp);
+        }
+        this.compilePoints();
+    }
 
-		this.waypoints = [];
-		this.previewPoint = null;
+    static getElementTop(el) {
+        const boardRect = board.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
+        return [
+            Math.round(rect.left - boardRect.left + rect.width / 2),
+            Math.round(rect.top - boardRect.top)
+        ];
+    }
 
-		this.group = this.createGroup();
+    static getElementBottom(el) {
+        const boardRect = board.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
+        return [
+            Math.round(rect.left - boardRect.left + rect.width / 2),
+            Math.round(rect.bottom - boardRect.top)
+        ];
+    }
 
-		const start = editor.getBottomCenter(fromNode);
+    static getMidpoint(first, second) {
+        const dx = second[0] - first[0];
+        const dy = second[1] - first[1];
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        if (absX === 0 || absY === 0 || absX === absY) {
+            return null;
+        }
 
-		this.previewPoint = [
-			start[0],
-			start[1] + DiagramEditor.SCALE
-		];
+        if (absX > absY) {
+            return [second[0] - absY * Math.sign(dx), first[1]];
+        } else {
+            return [first[0], second[1] - absX * Math.sign(dy)];
+        }
+    }
 
-		this.render();
-	}
+    static distToSegmentSq(p, a, b) {
+        const vx = b[0] - a[0];
+        const vy = b[1] - a[1];
+        const wx = p[0] - a[0];
+        const wy = p[1] - a[1];
+        const lenSq = vx * vx + vy * vy;
+        let t = lenSq === 0 ? 0 : (wx * vx + wy * vy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        const projX = a[0] + t * vx;
+        const projY = a[1] + t * vy;
+        const dx = p[0] - projX;
+        const dy = p[1] - projY;
+        return dx * dx + dy * dy;
+    }
 
-	// --------------------------------------------------
-	// SVG creation
-	// --------------------------------------------------
+    static createSvgEl(tag, attrs = {}) {
+        const el = document.createElementNS(SVG_NS, tag);
+        Arrow.updateSvgEl(el, attrs);
+        return el;
+    }
 
-	static createSvgElement(tag, attributes = {}) {
-		const element = document.createElementNS(Arrow.SVG_NS, tag);
+    static updateSvgEl(el, attrs) {
+        for (const [key, value] of Object.entries(attrs)) {
+            el.setAttribute(key, value);
+        }
+    }
 
-		for (const [key, value] of Object.entries(attributes)) {
-			element.setAttribute(key, value);
-		}
+    getCompiledWaypoints() {
+        const initial = snap(Arrow.getElementBottom(this.elementStart));
+        const afterInitial = [initial[0], initial[1] + scale];
+        const final = snap(Arrow.getElementTop(this.elementEnd));
+        const beforeFinal = [final[0], final[1] - scale];
+        return [initial, afterInitial, ...this.waypoints, beforeFinal, final];
+    }
 
-		return element;
-	}
+    compilePoints() {
+        const compiled_waypoints = this.getCompiledWaypoints();
+        const final = compiled_waypoints[compiled_waypoints.length - 1];
+        this.points = [];
+        for (let i = 0; i < compiled_waypoints.length - 1; i++) {
+            const first = compiled_waypoints[i];
+            const second = compiled_waypoints[i + 1];
+            this.points.push(first);
+            const midpoint = Arrow.getMidpoint(first, second);
+            if (midpoint) {
+                this.points.push(midpoint);
+            }
+        }
+        this.points.push(final);
+    }
 
-	createGroup() {
-		const group = Arrow.createSvgElement("g", {
-			class: "edge-group"
-		});
+    findInsertIndex(rawPoint) {
+        const compiled_waypoints = this.getCompiledWaypoints();
+        let bestLeg = 0;
+        let bestDist = Infinity;
 
-		this.hitPath = Arrow.createSvgElement("path", {
-			class: "edge-hit"
-		});
+        for (let i = 0; i < compiled_waypoints.length - 1; i++) {
+            const first = compiled_waypoints[i];
+            const second = compiled_waypoints[i + 1];
+            const midpoint = Arrow.getMidpoint(first, second);
+            const subSegments = midpoint
+                ? [[first, midpoint], [midpoint, second]]
+                : [[first, second]];
 
-		this.visiblePath = Arrow.createSvgElement("path", {
-			class: "edge draft",
-			"marker-end": "url(#arrow)"
-		});
+            for (const [a, b] of subSegments) {
+                const dist = Arrow.distToSegmentSq(rawPoint, a, b);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestLeg = i;
+                }
+            }
+        }
 
-		group.appendChild(this.hitPath);
-		group.appendChild(this.visiblePath);
+        return Math.max(0, Math.min(this.waypoints.length, bestLeg - 1));
+    }
 
-		this.editor.svg.appendChild(group);
+    drawArrow() {
+        const d = this.points
+            .map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`)
+            .join("");
+        if (!this.group) {
+            this.group = Arrow.createSvgEl("g", { class: "edge-group" });
+            this.hitPath = Arrow.createSvgEl("path", { class: "edge-hit", d });
+            this.visiblePath = Arrow.createSvgEl("path", { class: "edge", d, "marker-end": "url(#arrow)" });
+            this.group.appendChild(this.hitPath);
+            this.group.appendChild(this.visiblePath);
+            svg.appendChild(this.group);
 
-		group.addEventListener("click", (e) => {
-			e.stopPropagation();
-			this.editor.selectArrow(this);
-		});
+            this.hitPath.addEventListener("click", (e) => {
+                try {
+                    const boardRect = board.getBoundingClientRect();
+                    const rawPoint = [
+                        e.clientX - boardRect.left,
+                        e.clientY - boardRect.top
+                    ];
+                    const snapped = snap(rawPoint);
+                    const insertIndex = this.findInsertIndex(rawPoint);
+                    this.addWaypoint(snapped, insertIndex);
+                } catch (err) {
+                    document.getElementById("nav").innerText = err.stack;
+                }
+            });
+        } else {
+            Arrow.updateSvgEl(this.hitPath, { class: "edge-hit", d });
+            Arrow.updateSvgEl(this.visiblePath, { class: "edge", d, "marker-end": "url(#arrow)" });
+        }
+    }
 
-		return group;
-	}
+    addWaypoint(waypoint, index = this.waypoints.length) {
+        const snapped = snap(waypoint);
+        const circle = this.getDragElement(snapped);
+        this.waypoints.splice(index, 0, snapped);
+        this.dragElements.splice(index, 0, circle);
+        this.compilePoints();
+        this.drawArrow();
+    }
 
-	updatePath(points) {
-		const d = points
-			.map(([x, y], index) =>
-				`${index === 0 ? "M" : "L"} ${x} ${y}`
-			)
-			.join(" ");
+    editWaypoint(index, waypoint) {
+        if (index < 0 || index >= this.waypoints.length) return;
+        this.waypoints[index] = snap(waypoint);
+        this.compilePoints();
+        this.drawArrow();
+    }
 
-		this.hitPath.setAttribute("d", d);
-		this.visiblePath.setAttribute("d", d);
-	}
+    removeWaypoint(index) {
+        if (index < 0 || index >= this.waypoints.length) return;
+        const [circle] = this.dragElements.splice(index, 1);
+        if (circle) circle.remove();
+        this.waypoints.splice(index, 1);
+        this.compilePoints();
+        this.drawArrow();
+    }
 
-	// --------------------------------------------------
-	// Arrow lifecycle
-	// --------------------------------------------------
+    getDragElement(waypoint) {
+        const [originX, originY] = waypoint;
+        const circle = Arrow.createSvgEl("circle", {
+            class: "waypoint",
+            r: 8,
+            cx: originX,
+            cy: originY
+        });
+        svg.appendChild(circle);
 
-	complete(target) {
-		if (!this.fromNode.canConnectTo(target)) {
-			throw new Error("Cannot connect nodes of the same type.");
-		}
+        makeDraggable(circle, (dx, dy) => {
+            const index = this.dragElements.indexOf(circle);
+            this.editWaypoint(index, [originX + dx, originY + dy]);
+        });
 
-		this.toNode = target;
-		this.previewPoint = null;
+        circle.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            const index = this.dragElements.indexOf(circle);
+            this.removeWaypoint(index);
+        });
 
-		this.visiblePath.classList.remove("draft");
-
-		this.render();
-	}
-
-	remove() {
-		this.group.remove();
-	}
-
-	addWaypoint(point) {
-		const lastPoint = this.waypoints.at(-1);
-
-		if (
-			lastPoint &&
-			lastPoint[0] === point[0] &&
-			lastPoint[1] === point[1]
-		) {
-			return;
-		}
-
-		this.waypoints.push(point);
-		this.previewPoint = point;
-
-		this.render();
-	}
-
-	setPreviewPoint(point) {
-		this.previewPoint = point;
-		this.render();
-	}
-
-	// --------------------------------------------------
-	// Arrow routing
-	// --------------------------------------------------
-
-	getAnchors() {
-		const start = this.editor.getBottomCenter(this.fromNode);
-		const exitPoint = [
-			start[0],
-			start[1] + DiagramEditor.SCALE
-		];
-
-		const anchors = [
-			start,
-			exitPoint,
-			...this.waypoints
-		];
-
-		if (this.toNode) {
-			const lastAnchor = anchors.at(-1);
-
-			const end = this.editor.getNearestSideCenter(
-				this.toNode,
-				lastAnchor
-			);
-
-			if (end[0] !== lastAnchor[0] || end[1] !== lastAnchor[1]) {
-				anchors.push(end);
-			}
-		} else if (this.previewPoint) {
-			const lastAnchor = anchors.at(-1);
-
-			if (
-				this.previewPoint[0] !== lastAnchor[0] ||
-				this.previewPoint[1] !== lastAnchor[1]
-			) {
-				anchors.push(this.previewPoint);
-			}
-		}
-
-		return anchors;
-	}
-
-	getRoutePoints(anchors) {
-		const routePoints = [];
-
-		for (let i = 0; i < anchors.length - 1; i++) {
-			routePoints.push(anchors[i]);
-
-			const midpoint = this.editor.getMidpoint(
-				anchors[i],
-				anchors[i + 1]
-			);
-
-			if (midpoint) {
-				routePoints.push(midpoint);
-			}
-		}
-
-		routePoints.push(anchors.at(-1));
-
-		return routePoints;
-	}
-
-	render() {
-		const anchors = this.getAnchors();
-		const routePoints = this.getRoutePoints(anchors);
-
-		this.updatePath(routePoints);
-	}
+        return circle;
+    }
 }
 
+class Node {
+    static stateNames = new Set();
+    static triggersNames = new Set();
+    
+    constructor(type, name) {
+        if (type === "state") {
+            this.name = Node.getUnusedName(Node.stateNames, name);
+            Node.stateNames.add(this.name);
+            this.createElement("state states node");
+        } else if (type === "trigger") {
+            this.name = Node.getUnusedName(Node.triggersNames, name);
+            Node.triggersNames.add(this.name);
+            this.createElement("trigger triggers node");
+        }
+    }
 
-// ==================================================
-// Initialize
-// ==================================================
+    static getUnusedName(set, name) {
+        let unusedName = name;
+        let i = 1;
+        while (set.has(unusedName)) {
+            unusedName = `${name} (${i})`
+            i++;
+        }
+        return unusedName;
+    }
 
-const editor = new DiagramEditor(
-	document.getElementById("board"),
-	document.getElementById("edges")
-);
+    createElement(className) {
+		this.el = document.createElement("div");
+
+		this.el.className = className;
+		this.el.textContent = this.name;
+
+		this.el.style.position = "absolute";
+		this.el.style.left = "";
+		this.el.style.top = "";
+		this.el.style.cursor = "grab";
+		this.el.style.userSelect = "none";
+		this.el.style.touchAction = "none";
+		this.el.style.zIndex = "2";
+
+		const [x, y] = Node.randomPosition();
+
+		this.el.style.left = `${x}px`;
+		this.el.style.top = `${y}px`;
+
+        board.appendChild(this.el);
+        makeDraggable(this.el);
+
+        this.el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (this.el.dataset.dragging === "false") {
+                this.el.classList.toggle("pulse");
+            }
+        });
+    }
+
+    static randomPosition() {
+        return snap([Math.random() * 100 + 100, Math.random() * 100 + 100]);
+    }
+
+    
+}
+
+// var test = new Arrow(document.getElementById("test1"), [], document.getElementById("test2"));
+
+// makeDraggable(document.getElementById("test1"), () => {
+//     test.compilePoints();
+//     test.drawArrow();
+// });
+// makeDraggable(document.getElementById("test2"), () => {
+//     test.compilePoints();
+//     test.drawArrow();
+// });
+// test.drawArrow();
+
+new Node("state", "hi");
+new Node("trigger", "hi2");
+new Node("state", "hi3");

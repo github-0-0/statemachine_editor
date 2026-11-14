@@ -8,7 +8,7 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <div class="nav">😭 s T A T I C,,, v O I D ? ? ? w H A T   d O E S   T H A T   M E A N ? ? ? 🙏</div>
+        <div class="nav" id="nav">😭 s T A T I C,,, v O I D ? ? ? w H A T   d O E S   T H A T   M E A N ? ? ? 🙏</div>
         <div class="main">
             <div class="side">
                 <details class="selection states">
@@ -22,7 +22,7 @@
                         </div>
                     </div>
                     <div class="selection-body">
-                        <div class="state states" onclick="editor.insertState()">
+                        <div class="state states" onclick="//insertState()">
                             ==> Add state
                         </div>
                     </div>
@@ -35,7 +35,7 @@
                         </div>
                     </div>
                     <div class="selection-body">
-                        <div class="trigger triggers" onclick="editor.insertTrigger()">
+                        <div class="trigger triggers" onclick="//insertTrigger()">
                             ==> Add trigger
                         </div>
                     </div>
@@ -43,6 +43,12 @@
             </div>
             <div class="container">
                 <div class="board" id="board" style="width: 1600px; height: 1950px;">
+                    <!-- <div class="state states node" id="test1" style="left: 100px; top: 80px;">
+                        ExampleState
+                    </div>
+                    <div class="state states node" id="test2" style="left: 240px; top: 260px;">
+                        ExampleState2
+                    </div> -->
                     <svg id="edges">
                         <defs>
                             <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
@@ -62,6 +68,4 @@
             </div>
         </div>
         <script src="script.js"></script>
-        <script src="script2.js"></script>
-    </body>
 </html>

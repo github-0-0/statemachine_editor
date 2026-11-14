@@ -181,10 +181,37 @@ body {
     stroke-width: 3;
 }
 
+.waypoint {
+    stroke-width: 2;
+    fill: rgba(173, 255, 47, 0.2);
+    stroke: greenyellow;
+    pointer-events: all;
+}
+
+.waypoint:hover {
+    fill: rgba(6, 111, 22, 0.45);
+    stroke: #066f16;
+    stroke-dasharray: 5 4;
+}
+
 .node {
     position: absolute;
+    z-index: 2;
 }
 
 .node:active {
     cursor: grab;
+}
+
+.pulse {
+  animation: color-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes color-pulse {
+  0%, 100% {
+    background: grey;
+  }
+  50% {
+    background: black;
+  }
 }
