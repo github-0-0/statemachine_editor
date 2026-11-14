@@ -1,0 +1,190 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+:root {
+    --bg: #131313;
+    --grid: #333333;
+    --panel: #121212;
+    --text: #e6efe8;
+    --states: #06246f;
+    --triggers: #6f5306;
+    --subsystems: #6f1706;
+    --saves: #066f16;
+    --states-dull: #041540;
+    --triggers-dull: #413105;
+    --subsystems-dull: #3a0d04;
+    --saves-dull: #043e0d;
+    color-scheme: dark;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px 'Montserrat', sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+.nav {
+    padding: 10px;
+    background: var(--panel);
+    font-family: 'Courier Prime', monospace;
+    white-space: pre-wrap;
+    display: flex;
+    justify-content: center;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+}
+
+.container {  
+    flex: 1;
+    overflow: auto;
+}
+
+.board {
+    position: relative;
+    background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -10px -10px;
+}
+
+.side {
+    width: 340px;
+    flex: none;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: var(--panel);
+    border-left: 1px solid var(--grid);
+    border-right: 1px solid var(--grid);
+}
+
+.selection {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.selection-summary {
+    padding: 12px;
+    letter-spacing: 2px;
+}
+
+.selection-summary:hover {
+    background: rgba(0, 0, 0, 0.217);
+}
+
+.states {
+    background: var(--states);
+}
+
+.triggers {
+    background: var(--triggers);
+}
+
+.subsystems {
+    background: var(--subsystems);
+}
+
+.saves {
+    background: var(--saves);
+}
+
+.selection-body {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    font-family: 'Courier Prime', monospace;
+    border-bottom: 2px solid var(--grid);
+    border-left: 4px solid rgba(255, 255, 255, 0.25);
+}
+
+.state {
+    display: inline-block;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 25px;
+    padding: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(rgb(59, 54, 230) 0%, rgb(161, 162, 170) 30%, rgb(2, 20, 180), 50%, rgba(2, 10, 126, 0.96) 100%);
+    cursor: pointer;
+    text-shadow: 2px -2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.state:active {
+    background: linear-gradient(rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.7) 30%, rgba(0, 0, 0, 0.7), 50%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+.trigger {
+    display: inline-block;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 99px;
+    padding: 10px 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(rgb(177, 138, 7) 0%, rgb(190, 186, 186) 30%, rgb(138, 106, 0), 50%, rgb(106, 80, 1) 100%);
+    cursor: pointer;
+    corner-shape: bevel;
+    text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.9);
+}
+
+.trigger:active {
+    background: linear-gradient(rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.7) 30%, rgba(0, 0, 0, 0.7), 50%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+#edges {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#arrow path {
+    fill: greenyellow;
+}
+
+.edge {
+    fill: none;
+    stroke: greenyellow;
+    stroke-width: 2;
+    marker-end: url(#arrow);
+}
+
+.edge.draft {
+    stroke: green;
+    stroke-dasharray: 5 4;
+}
+
+.edge-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 14;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+.edge-group:hover .edge {
+    stroke: green;
+}
+
+.edge-group.selected .edge {
+    stroke: green;
+    stroke-width: 3;
+}
+
+.node {
+    position: absolute;
+}
+
+.node:active {
+    cursor: grab;
+}

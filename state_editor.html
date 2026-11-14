@@ -1,0 +1,67 @@
+<html>
+    <head>
+        <title>staticvoid</title>
+        <link rel="preconnect" href="https://googleapis.com">
+        <link rel="preconnect" href="https://gstatic.com" crossorigin>
+        <link href="https://googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div class="nav">😭 s T A T I C,,, v O I D ? ? ? w H A T   d O E S   T H A T   M E A N ? ? ? 🙏</div>
+        <div class="main">
+            <div class="side">
+                <details class="selection states">
+                    <summary class="selection-summary">states</summary>
+                    <div class="selection-body">
+                        <div class="state states">
+                            <details>
+                                <summary class="editable-text">ExampleState</summary>
+                                ==> Position (Deg): <input type="number" style="width: 15%;">  
+                            </details>
+                        </div>
+                    </div>
+                    <div class="selection-body">
+                        <div class="state states" onclick="editor.insertState()">
+                            ==> Add state
+                        </div>
+                    </div>
+                </details>
+                <details class="selection triggers">
+                    <summary class="selection-summary">triggers</summary>
+                    <div class="selection-body">
+                        <div class="trigger triggers">
+                            ExampleTrigger
+                        </div>
+                    </div>
+                    <div class="selection-body">
+                        <div class="trigger triggers" onclick="editor.insertTrigger()">
+                            ==> Add trigger
+                        </div>
+                    </div>
+                </details>
+            </div>
+            <div class="container">
+                <div class="board" id="board" style="width: 1600px; height: 1950px;">
+                    <svg id="edges">
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                                <path d="M0 0L10 5L0 10z"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+            <div class="side">
+                <details class="selection subsystems">
+                    <summary class="selection-summary">subsystems</summary>
+                </details>
+                <details class="selection saves">
+                    <summary class="selection-summary">saves</summary>
+                </details>
+            </div>
+        </div>
+        <script src="script.js"></script>
+        <script src="script2.js"></script>
+    </body>
+</html>
