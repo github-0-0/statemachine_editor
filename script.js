@@ -383,26 +383,15 @@ function updateArrowsForNode(nodeId) {
 }
 
 class Node {
-    static stateNames = new Set();
-    static triggersNames = new Set();
-
     static draftNodeId = null;
 
-    constructor(type, name) {
+    constructor(data) {
         this.id = registerGraphObject(this, "node");
-        this.type = type;
-
-        if (type === "state") {
-            this.name = Node.getUnusedName(Node.stateNames, name);
-            Node.stateNames.add(this.name);
-            this.createElement("state states node");
-        } else if (type === "trigger") {
-            this.name = Node.getUnusedName(Node.triggersNames, name);
-            Node.triggersNames.add(this.name);
-            this.createElement("trigger triggers node");
-        }
+        this.data = data;
+        this.name = data.name;
 
         this.draft = false;
+        this.createElement(data.className);
     }
 
     static getUnusedName(set, name) {
@@ -469,7 +458,7 @@ class Node {
 
                     Node.draftNodeId = null;
 
-                    if (otherNode.type !== this.type) {
+                    if (otherNode.data.type !== this.data.type) {
                         const arrow = new Arrow(otherNode.id, [], this.id);
                         arrow.drawArrow();
                     }
@@ -487,6 +476,224 @@ class Node {
     }
 }
 
-new Node("state", "Default");
-new Node("trigger", "ExampleTrigger");
-new Node("state", "ExampleState");
+class StateData {
+    static stateNames = new Set();
+    static stateBlocks = document.getElementById("states");
+
+    constructor(name, attrs = {}) {
+        if (name === "") {
+            throw new Error("Can't have empty name");
+        }
+        if (StateData.stateNames.has(name)) {
+            throw new Error("Name exists");
+        }
+        this.name = name;
+        this.type = "state";
+        this.attrs = attrs;
+        this.className = "state states node";
+        this.nodeEl = null;
+        this.createElement();
+        StateData.stateNames.add(name);
+    }
+
+    createElement() {
+        const body = document.createElement("div");
+        body.className = "selection-body";
+        const div = document.createElement("div");
+        div.className = "state states";
+        const insert = document.createElement("button");
+        insert.innerText = '==>';
+        insert.onclick = () => {
+            if (!this.nodeEl) new Node(this);
+        };
+
+        if (Object.keys(this.attrs).length !== 0) {
+            const details = document.createElement("details");
+            const summary = document.createElement("summary");
+            const name = document.createElement("text");
+            name.innerText = "> " + this.name;
+            summary.classList.add("leftright");
+            summary.appendChild(name);
+            summary.appendChild(insert);
+            details.appendChild(summary);
+            div.appendChild(details);
+
+            for (const [key, value] of Object.entries(this.attrs)) {
+                const p = document.createElement("text");
+                p.innerText = "==> " + key + ": ";
+                const input = document.createElement("input");
+                input.id = "hi";
+                input.type = value;
+                input.style = "width: 15%; min-width: 0;"; 
+                p.append(input);
+                details.append(p);
+            }
+        } else {
+            div.innerText = this.name;
+            div.appendChild(insert);
+            div.classList.add("leftright");
+        }
+        body.appendChild(div);
+        StateData.stateBlocks.prepend(body);
+    }
+}
+
+// new Node("state", "Default");
+// new Node("trigger", "ExampleTrigger");
+// new Node("state", "ExampleState");
+
+
+const stateProps = [];
+const stateInputTypes = {
+    "Angle": "number",
+    "Angular Velocity": "number",
+    "Distance": "number",
+    "Linear Velocity": "number",
+};
+
+function addState() {
+    const attrs = Object.fromEntries(stateProps.map(prop => 
+        [prop.name.value, stateInputTypes[prop.type.value]]
+    ));
+    new StateData(document.getElementById("stateName").value, attrs);
+}
+
+function addStateProperty() {
+    const container = document.createElement("div");
+    container.style = "display: flex;";
+    const name = document.createElement("input");
+    name.placeholder = "name";
+    const colon = document.createElement("text");
+    colon.innerText = ": ";
+    const select = document.createElement("select");
+    const angle = document.createElement("option");
+    angle.innerText = "Angle";
+    const angularVelocity = document.createElement("option");
+    angularVelocity.innerText = "Angular Velocity";
+    const distance = document.createElement("option");
+    distance.innerText = "Distance";
+    const linearVelocity = document.createElement("option");
+    linearVelocity.innerText = "Linear Velocity";
+
+    select.append(angle);
+    select.append(angularVelocity);
+    select.append(distance);
+    select.append(linearVelocity);
+
+    const br = document.createElement("br");
+    container.appendChild(name);
+    container.append(colon);
+    container.append(select);
+    container.append(br);
+    const el = document.getElementById("addState");
+    el.append(container);
+
+    stateProps.push({name: name, type: select});
+}
+
+class TriggerData {
+    static triggerNames = new Set();
+    static triggerBlocks = document.getElementById("triggers");
+
+    constructor(name, attrs = {}) {
+        if (name === "") {
+            throw new Error("Can't have empty name");
+        }
+        if (TriggerData.triggerNames.has(name)) {
+            throw new Error("Name exists");
+        }
+        this.name = name;
+        this.type = "trigger";
+        this.attrs = attrs;
+        this.className = "trigger triggers node";
+        this.nodeEl = null;
+        this.createElement();
+        TriggerData.triggerNames.add(name);
+    }
+
+    createElement() {
+        const body = document.createElement("div");
+        body.className = "selection-body";
+
+        const div = document.createElement("div");
+        div.className = "trigger triggers";
+        const insert = document.createElement("button");
+        insert.innerText = '==>';
+        insert.onclick = () => {
+            if (!this.nodeEl) new Node(this);
+        };
+
+        if (Object.keys(this.attrs).length !== 0) {
+            const details = document.createElement("details");
+            const summary = document.createElement("summary");
+            const name = document.createElement("text");
+
+
+            name.innerText = "> " + this.name;
+
+            summary.classList.add("leftright");
+            summary.append(name, insert);
+            details.appendChild(summary);
+            div.appendChild(details);
+
+            for (const [key, value] of Object.entries(this.attrs)) {
+                const p = document.createElement("text");
+                p.innerText = "==> " + key + ": ";
+
+                const input = document.createElement("input");
+                input.type = value;
+                input.style = "width: 15%; min-width: 0;";
+
+                p.append(input);
+                details.append(p);
+            }
+        } else {
+            div.innerText = this.name;
+            div.classList.add("leftright");
+            div.append(insert);
+        }
+
+        body.appendChild(div);
+        TriggerData.triggerBlocks.prepend(body);
+    }
+}
+
+const triggerProps = [];
+
+const triggerInputTypes = {
+    "Button Down": "text",
+    "Beam Break Dist": "number"
+}
+
+function addTrigger() {
+    const attrs = Object.fromEntries(triggerProps.map(prop =>
+        [prop.name.value, triggerInputTypes[prop.type.value]]
+    ));
+
+    new TriggerData(document.getElementById("triggerName").value, attrs);
+}
+
+function addTriggerProperty() {
+    const container = document.createElement("div");
+    container.style = "display: flex;";
+
+    const name = document.createElement("input");
+    name.placeholder = "name";
+
+    const colon = document.createElement("text");
+    colon.innerText = ": ";
+
+    const select = document.createElement("select");
+
+    for (const type of Object.keys(triggerInputTypes)) {
+        const option = document.createElement("option");
+        option.innerText = type;
+        select.append(option);
+    }
+
+    container.append(name, colon, select);
+
+    document.getElementById("addTrigger").append(container);
+
+    triggerProps.push({ name, type: select });
+}

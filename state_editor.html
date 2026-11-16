@@ -8,35 +8,26 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <div class="nav" id="nav">😭 s T A T I C,,, v O I D ? ? ? w H A T   d O E S   T H A T   M E A N ? ? ? 🙏</div>
+        <div class="nav" id="nav">S T A T I C   V O I D</div>
         <div class="main">
             <div class="side">
-                <details class="selection states">
+                <details class="selection states" id="states">
                     <summary class="selection-summary">states</summary>
                     <div class="selection-body">
-                        <div class="state states">
-                            <details>
-                                <summary class="editable-text">ExampleState</summary>
-                                ==> Position (Deg): <input type="number" style="width: 15%;">  
-                            </details>
-                        </div>
-                    </div>
-                    <div class="selection-body">
-                        <div class="state states" onclick="//insertState()">
-                            ==> Add state
+                        <div id="addState" class="state states" >
+                            Add State <button onclick="addState()">==></button> <br>
+                            Name: <input id="stateName" type="text"> <hr>
+                            Add Additional Property: <button onclick="addStateProperty()">+</button>
                         </div>
                     </div>
                 </details>
-                <details class="selection triggers">
+                <details class="selection triggers" id="triggers">
                     <summary class="selection-summary">triggers</summary>
                     <div class="selection-body">
-                        <div class="trigger triggers">
-                            ExampleTrigger
-                        </div>
-                    </div>
-                    <div class="selection-body">
-                        <div class="trigger triggers" onclick="//insertTrigger()">
-                            ==> Add trigger
+                        <div id="addTrigger" class="trigger triggers">
+                            <div>Add Trigger <button onclick="addTrigger()">==></button> <br> </div>
+                            Name: <input id="triggerName" type="text"> <hr>
+                            Add Additional Property: <button onclick="addTriggerProperty()">+</button>
                         </div>
                     </div>
                 </details>
