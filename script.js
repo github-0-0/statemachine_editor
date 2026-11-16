@@ -14,6 +14,22 @@ function registerGraphObject(object, prefix) {
     return id;
 }
 
+function createRemoveButton(onRemove, label = "Remove") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerText = "\u2715";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+
+    button.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onRemove();
+    });
+
+    return button;
+}
+
 function snap(point) {
     return [
         Math.round(point[0] / scale) * scale,
@@ -264,21 +280,17 @@ class Arrow {
             svg.appendChild(this.group);
 
             this.hitPath.addEventListener("click", (e) => {
-                try {
-                    const boardRect = board.getBoundingClientRect();
+                const boardRect = board.getBoundingClientRect();
 
-                    const rawPoint = [
-                        e.clientX - boardRect.left,
-                        e.clientY - boardRect.top
-                    ];
+                const rawPoint = [
+                    e.clientX - boardRect.left,
+                    e.clientY - boardRect.top
+                ];
 
-                    const snapped = snap(rawPoint);
-                    const insertIndex = this.findInsertIndex(rawPoint);
+                const snapped = snap(rawPoint);
+                const insertIndex = this.findInsertIndex(rawPoint);
 
-                    this.addWaypoint(snapped, insertIndex);
-                } catch (err) {
-                    document.getElementById("nav").innerText = err.stack;
-                }
+                this.addWaypoint(snapped, insertIndex);
             });
 
             this.hitPath.addEventListener("contextmenu", (e) => {
@@ -389,9 +401,9 @@ class Node {
         this.id = registerGraphObject(this, "node");
         this.data = data;
         this.name = data.name;
-
         this.draft = false;
         this.createElement(data.className);
+        data.nodeEl = this;
     }
 
     static getUnusedName(set, name) {
@@ -471,27 +483,53 @@ class Node {
         });
     }
 
+    remove() {
+        if (Node.draftNodeId === this.id) {
+            Node.draftNodeId = null;
+        }
+
+        this.el.classList.remove("pulse");
+
+        for (const object of [...graphObjects.values()]) {
+            if (
+                object instanceof Arrow &&
+                (object.startNodeId === this.id || object.endNodeId === this.id)
+            ) {
+                object.remove();
+            }
+        }
+
+        this.el.remove();
+        graphObjects.delete(this.id);
+
+        if (this.data.nodeEl === this) {
+            this.data.nodeEl = null;
+        }
+    }
+
     static randomPosition() {
         return snap([Math.random() * 100 + 100, Math.random() * 100 + 100]);
     }
 }
-
 class StateData {
     static stateNames = new Set();
     static stateBlocks = document.getElementById("states");
 
     constructor(name, attrs = {}) {
+        name = name.toUpperCase();
         if (name === "") {
             throw new Error("Can't have empty name");
         }
         if (StateData.stateNames.has(name)) {
             throw new Error("Name exists");
         }
+
         this.name = name;
         this.type = "state";
         this.attrs = attrs;
         this.className = "state states node";
         this.nodeEl = null;
+
         this.createElement();
         StateData.stateNames.add(name);
     }
@@ -499,49 +537,76 @@ class StateData {
     createElement() {
         const body = document.createElement("div");
         body.className = "selection-body";
+        this.el = body;
+
         const div = document.createElement("div");
         div.className = "state states";
+
         const insert = document.createElement("button");
-        insert.innerText = '==>';
-        insert.onclick = () => {
+        insert.type = "button";
+        insert.innerText = "==>";
+        insert.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             if (!this.nodeEl) new Node(this);
         };
+
+        const remove = createRemoveButton(
+            () => this.remove(),
+            `Remove state ${this.name}`
+        );
 
         if (Object.keys(this.attrs).length !== 0) {
             const details = document.createElement("details");
             const summary = document.createElement("summary");
             const name = document.createElement("text");
+
             name.innerText = "> " + this.name;
             summary.classList.add("leftright");
-            summary.appendChild(name);
-            summary.appendChild(insert);
+            summary.append(remove, name, insert);
+
             details.appendChild(summary);
             div.appendChild(details);
 
             for (const [key, value] of Object.entries(this.attrs)) {
                 const p = document.createElement("text");
                 p.innerText = "==> " + key + ": ";
+
                 const input = document.createElement("input");
-                input.id = "hi";
                 input.type = value;
-                input.style = "width: 15%; min-width: 0;"; 
+                input.style = "width: 15%; min-width: 0;";
+
                 p.append(input);
+
+                p.append(createRemoveButton(() => {
+                    delete this.attrs[key];
+                    p.remove();
+                }, `Remove property ${key}`));
+
                 details.append(p);
             }
         } else {
-            div.innerText = this.name;
-            div.appendChild(insert);
+            const name = document.createElement("text");
+            name.innerText = this.name;
+
             div.classList.add("leftright");
+            div.append(remove, name, insert);
         }
+
         body.appendChild(div);
-        StateData.stateBlocks.prepend(body);
+        StateData.stateBlocks.append(body);
+    }
+
+    remove() {
+        if (this.nodeEl) {
+            this.nodeEl.remove();
+        }
+
+        this.el.remove();
+        StateData.stateNames.delete(this.name);
     }
 }
-
-// new Node("state", "Default");
-// new Node("trigger", "ExampleTrigger");
-// new Node("state", "ExampleState");
-
 
 const stateProps = [];
 const stateInputTypes = {
@@ -555,58 +620,60 @@ function addState() {
     const attrs = Object.fromEntries(stateProps.map(prop => 
         [prop.name.value, stateInputTypes[prop.type.value]]
     ));
-    new StateData(document.getElementById("stateName").value, attrs);
+    new StateData(document.getElementById("stateName").value.toUpperCase(), attrs);
 }
 
 function addStateProperty() {
     const container = document.createElement("div");
-    container.style = "display: flex;";
+    container.classList.add("leftright");
+
     const name = document.createElement("input");
     name.placeholder = "name";
+    name.style = "width: 30%";
+
     const colon = document.createElement("text");
     colon.innerText = ": ";
+
     const select = document.createElement("select");
-    const angle = document.createElement("option");
-    angle.innerText = "Angle";
-    const angularVelocity = document.createElement("option");
-    angularVelocity.innerText = "Angular Velocity";
-    const distance = document.createElement("option");
-    distance.innerText = "Distance";
-    const linearVelocity = document.createElement("option");
-    linearVelocity.innerText = "Linear Velocity";
 
-    select.append(angle);
-    select.append(angularVelocity);
-    select.append(distance);
-    select.append(linearVelocity);
+    for (const type of Object.keys(stateInputTypes)) {
+        const option = document.createElement("option");
+        option.innerText = type;
+        select.append(option);
+    }
 
-    const br = document.createElement("br");
-    container.appendChild(name);
-    container.append(colon);
-    container.append(select);
-    container.append(br);
-    const el = document.getElementById("addState");
-    el.append(container);
+    const prop = { name, type: select };
 
-    stateProps.push({name: name, type: select});
+    const remove = createRemoveButton(() => {
+        const index = stateProps.indexOf(prop);
+        if (index !== -1) stateProps.splice(index, 1);
+        container.remove();
+    }, "Remove property");
+
+    container.append(remove, name, colon, select);
+
+    document.getElementById("addState").append(container);
+    stateProps.push(prop);
 }
-
 class TriggerData {
     static triggerNames = new Set();
     static triggerBlocks = document.getElementById("triggers");
 
     constructor(name, attrs = {}) {
+        name = name.toUpperCase();
         if (name === "") {
             throw new Error("Can't have empty name");
         }
         if (TriggerData.triggerNames.has(name)) {
             throw new Error("Name exists");
         }
+
         this.name = name;
         this.type = "trigger";
         this.attrs = attrs;
         this.className = "trigger triggers node";
         this.nodeEl = null;
+
         this.createElement();
         TriggerData.triggerNames.add(name);
     }
@@ -614,25 +681,36 @@ class TriggerData {
     createElement() {
         const body = document.createElement("div");
         body.className = "selection-body";
+        this.el = body;
 
         const div = document.createElement("div");
         div.className = "trigger triggers";
+
         const insert = document.createElement("button");
-        insert.innerText = '==>';
-        insert.onclick = () => {
+        insert.type = "button";
+        insert.innerText = "==>";
+        insert.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             if (!this.nodeEl) new Node(this);
         };
+
+        const remove = createRemoveButton(
+            () => this.remove(),
+            `Remove trigger ${this.name}`
+        );
 
         if (Object.keys(this.attrs).length !== 0) {
             const details = document.createElement("details");
             const summary = document.createElement("summary");
             const name = document.createElement("text");
 
-
             name.innerText = "> " + this.name;
 
             summary.classList.add("leftright");
-            summary.append(name, insert);
+            summary.append(remove, name, insert);
+
             details.appendChild(summary);
             div.appendChild(details);
 
@@ -645,16 +723,33 @@ class TriggerData {
                 input.style = "width: 15%; min-width: 0;";
 
                 p.append(input);
+
+                p.append(createRemoveButton(() => {
+                    delete this.attrs[key];
+                    p.remove();
+                }, `Remove property ${key}`));
+
                 details.append(p);
             }
         } else {
-            div.innerText = this.name;
+            const name = document.createElement("text");
+            name.innerText = this.name;
+
             div.classList.add("leftright");
-            div.append(insert);
+            div.append(remove, name, insert);
         }
 
         body.appendChild(div);
-        TriggerData.triggerBlocks.prepend(body);
+        TriggerData.triggerBlocks.append(body);
+    }
+
+    remove() {
+        if (this.nodeEl) {
+            this.nodeEl.remove();
+        }
+
+        this.el.remove();
+        TriggerData.triggerNames.delete(this.name);
     }
 }
 
@@ -670,15 +765,16 @@ function addTrigger() {
         [prop.name.value, triggerInputTypes[prop.type.value]]
     ));
 
-    new TriggerData(document.getElementById("triggerName").value, attrs);
+    new TriggerData(document.getElementById("triggerName").value.toUpperCase, attrs);
 }
 
 function addTriggerProperty() {
     const container = document.createElement("div");
-    container.style = "display: flex;";
+    container.classList.add("leftright");
 
     const name = document.createElement("input");
     name.placeholder = "name";
+    name.style = "width: 30px";
 
     const colon = document.createElement("text");
     colon.innerText = ": ";
@@ -691,9 +787,20 @@ function addTriggerProperty() {
         select.append(option);
     }
 
-    container.append(name, colon, select);
+    const prop = { name, type: select };
+
+    const remove = createRemoveButton(() => {
+        const index = triggerProps.indexOf(prop);
+        if (index !== -1) triggerProps.splice(index, 1);
+        container.remove();
+    }, "Remove property");
+
+    container.append(remove, name, colon, select);
 
     document.getElementById("addTrigger").append(container);
-
-    triggerProps.push({ name, type: select });
+    triggerProps.push(prop);
 }
+
+new StateData("Default");
+new StateData("Example_State");
+new TriggerData("Example_Trigger");
