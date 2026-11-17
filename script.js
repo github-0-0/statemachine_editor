@@ -1,3 +1,4 @@
+
 const scale = 20;
 const board = document.getElementById('board');
 const svg = document.getElementById('edges');
@@ -17,9 +18,12 @@ function registerGraphObject(object, prefix) {
 function createRemoveButton(onRemove, label = "Remove") {
     const button = document.createElement("button");
     button.type = "button";
-    button.innerText = "\u2715";
+    button.style.background = "none";
+    button.style.aspectRatio = "1";
+    button.innerText = "\u00d7";
     button.title = label;
     button.setAttribute("aria-label", label);
+    // button.appendChild(image); 
 
     button.addEventListener("click", (e) => {
         e.preventDefault();
@@ -357,6 +361,8 @@ class Arrow {
     getDragElement(waypoint) {
         const [originX, originY] = waypoint;
 
+        // const gradient = Arrow.createSvgEl("")
+
         const circle = Arrow.createSvgEl("circle", {
             class: "waypoint",
             r: 8,
@@ -422,7 +428,7 @@ class Node {
         this.el = document.createElement("div");
 
         this.el.className = className;
-        this.el.textContent = this.name;
+        this.el.innerText = this.name;
 
         this.el.style.position = "absolute";
         this.el.style.left = "";
@@ -481,6 +487,12 @@ class Node {
                 }
             }
         });
+
+        this.el.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+
+            this.remove();
+        });
     }
 
     remove() {
@@ -511,9 +523,67 @@ class Node {
         return snap([Math.random() * 100 + 100, Math.random() * 100 + 100]);
     }
 }
+
 class StateData {
     static stateNames = new Set();
     static stateBlocks = document.getElementById("states");
+    static stateProps = [];
+    static stateInputTypes = {
+        "Angle": "number",
+        "Angular Velocity": "number",
+        "Distance": "number",
+        "Linear Velocity": "number",
+    };
+
+    static addState() {
+        const attrs = Object.fromEntries(StateData.stateProps.map(prop => 
+            [prop.name.value, StateData.stateInputTypes[prop.type.value]]
+        ));
+        new StateData(document.getElementById("stateName").value.toUpperCase(), attrs);
+        StateData.reset();
+    }
+
+    static addStateProperty() {
+        const container = document.createElement("div");
+        container.classList.add("leftright");
+
+        const name = document.createElement("input");
+        name.placeholder = "name";
+        name.style = "width: 30%; height: 24px";
+
+        const colon = document.createElement("text");
+        colon.innerText = ": ";
+
+        const select = document.createElement("select");
+        select.style = "height: 24px";
+
+        for (const type of Object.keys(StateData.stateInputTypes)) {
+            const option = document.createElement("option");
+            option.innerText = type;
+            select.append(option);
+        }
+
+        const prop = { name, type: select, container };
+
+        const remove = createRemoveButton(() => {
+            const index = StateData.stateProps.indexOf(prop);
+            if (index !== -1) StateData.stateProps.splice(index, 1);
+            container.remove();
+        }, "Remove property");
+
+        container.append(remove, name, colon, select);
+
+        document.getElementById("addState").append(container);
+        StateData.stateProps.push(prop);
+    }
+
+    static reset() {
+        document.getElementById("stateName").value = "";
+        for (const prop of StateData.stateProps) {
+            prop.container.remove();
+        }
+        StateData.stateProps = [];
+    }
 
     constructor(name, attrs = {}) {
         name = name.toUpperCase();
@@ -527,7 +597,7 @@ class StateData {
         this.name = name;
         this.type = "state";
         this.attrs = attrs;
-        this.className = "state states node";
+        this.className = "state states node glass";
         this.nodeEl = null;
 
         this.createElement();
@@ -540,7 +610,7 @@ class StateData {
         this.el = body;
 
         const div = document.createElement("div");
-        div.className = "state states";
+        div.className = "state states glass";
 
         const insert = document.createElement("button");
         insert.type = "button";
@@ -571,11 +641,13 @@ class StateData {
 
             for (const [key, value] of Object.entries(this.attrs)) {
                 const p = document.createElement("text");
+                p.classList.add("leftright");
+                const hr = document.createElement("hr");
                 p.innerText = "==> " + key + ": ";
 
                 const input = document.createElement("input");
                 input.type = value;
-                input.style = "width: 15%; min-width: 0;";
+                input.style = "width: 30%; min-width: 0;";
 
                 p.append(input);
 
@@ -584,7 +656,7 @@ class StateData {
                     p.remove();
                 }, `Remove property ${key}`));
 
-                details.append(p);
+                details.append(hr, p);
             }
         } else {
             const name = document.createElement("text");
@@ -608,56 +680,66 @@ class StateData {
     }
 }
 
-const stateProps = [];
-const stateInputTypes = {
-    "Angle": "number",
-    "Angular Velocity": "number",
-    "Distance": "number",
-    "Linear Velocity": "number",
-};
-
-function addState() {
-    const attrs = Object.fromEntries(stateProps.map(prop => 
-        [prop.name.value, stateInputTypes[prop.type.value]]
-    ));
-    new StateData(document.getElementById("stateName").value.toUpperCase(), attrs);
-}
-
-function addStateProperty() {
-    const container = document.createElement("div");
-    container.classList.add("leftright");
-
-    const name = document.createElement("input");
-    name.placeholder = "name";
-    name.style = "width: 30%";
-
-    const colon = document.createElement("text");
-    colon.innerText = ": ";
-
-    const select = document.createElement("select");
-
-    for (const type of Object.keys(stateInputTypes)) {
-        const option = document.createElement("option");
-        option.innerText = type;
-        select.append(option);
-    }
-
-    const prop = { name, type: select };
-
-    const remove = createRemoveButton(() => {
-        const index = stateProps.indexOf(prop);
-        if (index !== -1) stateProps.splice(index, 1);
-        container.remove();
-    }, "Remove property");
-
-    container.append(remove, name, colon, select);
-
-    document.getElementById("addState").append(container);
-    stateProps.push(prop);
-}
 class TriggerData {
     static triggerNames = new Set();
     static triggerBlocks = document.getElementById("triggers");
+    static triggerProps = [];
+
+    static triggerInputTypes = {
+        "Button Down": "text",
+        "Beam Break Dist": "number"
+    }
+
+    static addTrigger() {
+        const attrs = Object.fromEntries(TriggerData.triggerProps.map(prop =>
+            [prop.name.value, TriggerData.triggerInputTypes[prop.type.value]]
+        ));
+
+        new TriggerData(document.getElementById("triggerName").value.toUpperCase(), attrs);
+        TriggerData.reset();
+    }
+
+    static addTriggerProperty() {
+        const container = document.createElement("div");
+        container.classList.add("leftright");
+
+        const name = document.createElement("input");
+        name.placeholder = "name";
+        name.style = "width: 30%; height: 24px";
+
+        const colon = document.createElement("text");
+        colon.innerText = ": ";
+
+        const select = document.createElement("select");
+        select.style = "height: 24px";
+
+        for (const type of Object.keys(TriggerData.triggerInputTypes)) {
+            const option = document.createElement("option");
+            option.innerText = type;
+            select.append(option);
+        }
+
+        const prop = { name, type: select, container };
+
+        const remove = createRemoveButton(() => {
+            const index = TriggerData.triggerProps.indexOf(prop);
+            if (index !== -1) TriggerData.triggerProps.splice(index, 1);
+            container.remove();
+        }, "Remove property");
+
+        container.append(remove, name, colon, select);
+
+        document.getElementById("addTrigger").append(container);
+        TriggerData.triggerProps.push(prop);
+    }
+
+    static reset() {
+        document.getElementById("triggerName").value = "";
+        for (const prop of TriggerData.triggerProps) {
+            prop.container.remove();
+        }
+        TriggerData.triggerProps = [];
+    }
 
     constructor(name, attrs = {}) {
         name = name.toUpperCase();
@@ -671,7 +753,7 @@ class TriggerData {
         this.name = name;
         this.type = "trigger";
         this.attrs = attrs;
-        this.className = "trigger triggers node";
+        this.className = "trigger triggers node glass";
         this.nodeEl = null;
 
         this.createElement();
@@ -684,7 +766,7 @@ class TriggerData {
         this.el = body;
 
         const div = document.createElement("div");
-        div.className = "trigger triggers";
+        div.className = "trigger triggers glass";
 
         const insert = document.createElement("button");
         insert.type = "button";
@@ -716,11 +798,13 @@ class TriggerData {
 
             for (const [key, value] of Object.entries(this.attrs)) {
                 const p = document.createElement("text");
+                p.classList.add("leftright");
+                const hr = document.createElement("hr");
                 p.innerText = "==> " + key + ": ";
 
                 const input = document.createElement("input");
                 input.type = value;
-                input.style = "width: 15%; min-width: 0;";
+                input.style = "width: 30%; min-width: 0;";
 
                 p.append(input);
 
@@ -729,7 +813,7 @@ class TriggerData {
                     p.remove();
                 }, `Remove property ${key}`));
 
-                details.append(p);
+                details.append(hr, p);
             }
         } else {
             const name = document.createElement("text");
@@ -753,54 +837,6 @@ class TriggerData {
     }
 }
 
-const triggerProps = [];
-
-const triggerInputTypes = {
-    "Button Down": "text",
-    "Beam Break Dist": "number"
-}
-
-function addTrigger() {
-    const attrs = Object.fromEntries(triggerProps.map(prop =>
-        [prop.name.value, triggerInputTypes[prop.type.value]]
-    ));
-
-    new TriggerData(document.getElementById("triggerName").value.toUpperCase, attrs);
-}
-
-function addTriggerProperty() {
-    const container = document.createElement("div");
-    container.classList.add("leftright");
-
-    const name = document.createElement("input");
-    name.placeholder = "name";
-    name.style = "width: 30px";
-
-    const colon = document.createElement("text");
-    colon.innerText = ": ";
-
-    const select = document.createElement("select");
-
-    for (const type of Object.keys(triggerInputTypes)) {
-        const option = document.createElement("option");
-        option.innerText = type;
-        select.append(option);
-    }
-
-    const prop = { name, type: select };
-
-    const remove = createRemoveButton(() => {
-        const index = triggerProps.indexOf(prop);
-        if (index !== -1) triggerProps.splice(index, 1);
-        container.remove();
-    }, "Remove property");
-
-    container.append(remove, name, colon, select);
-
-    document.getElementById("addTrigger").append(container);
-    triggerProps.push(prop);
-}
-
 new StateData("Default");
-new StateData("Example_State");
-new TriggerData("Example_Trigger");
+new StateData("Example State");
+new TriggerData("Example Trigger");

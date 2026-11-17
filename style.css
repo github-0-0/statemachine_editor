@@ -2,19 +2,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 
 :root {
-    --bg: #131313;
-    --grid: #333333;
-    --panel: #121212;
-    --text: #e6efe8;
-    --states: #06246f;
-    --triggers: #6f5306;
-    --subsystems: #6f1706;
-    --saves: #066f16;
-    --states-dull: #041540;
-    --triggers-dull: #413105;
-    --subsystems-dull: #3a0d04;
-    --saves-dull: #043e0d;
-    color-scheme: dark;
+    --bg: radial-gradient(
+        farthest-corner at 40px 40px,
+        #888 0%,
+        #ededed 100%);
+    --grid: #56555d;
+    --panel: radial-gradient(
+        farthest-corner at 40px 40px,
+        #888 0%,
+        #ededed 100%);;
+    --text: #00043c;
+    --states: #4a75e2;
+    --triggers: #eeb20e;
+    --subsystems: #ec320d;
+    --saves: #0bea2c;
+    --states-dull: #0d3ebb;
+    --triggers-dull: #c39412;
+    --subsystems-dull: #be2d10;
+    --saves-dull: #0bbe26;
+    --arrow: green;
+    color-scheme: light;
+  	interpolate-size: allow-keywords;
 }
 
 html,
@@ -72,8 +80,23 @@ option {
     overflow-y: auto;
     box-sizing: border-box;
     background: var(--panel);
-    border-left: 1px solid var(--grid);
-    border-right: 1px solid var(--grid);
+    /* border-left: 1px solid var(--grid);
+    border-right: 1px solid var(--grid); */
+}
+
+details::details-content {
+	block-size: 0;
+	opacity: 0;
+	overflow: hidden;
+	transition: 
+		block-size 0.3s ease,
+		opacity 0.3s ease,
+		content-visibility 0.3s allow-discrete;
+}
+
+details[open]::details-content {
+	block-size: auto;
+	opacity: 1;
 }
 
 .selection {
@@ -87,6 +110,7 @@ option {
 }
 
 .selection-summary:hover {
+	transition: 0.1s ease-in-out 0s;
     background: rgba(0, 0, 0, 0.217);
 }
 
@@ -107,10 +131,10 @@ option {
 }
 
 .selection-body {
-    padding: 20px;
+    padding: 10px;
     background: rgba(0, 0, 0, 0.5);
-    border-bottom: 2px solid var(--grid);
-    border-left: 4px solid rgba(255, 255, 255, 0.25);
+    /* border-bottom: 2px solid var(--grid);
+    border-left: 4px solid rgba(255, 255, 255, 0.25); */
 }
 
 .state {
@@ -125,7 +149,9 @@ option {
 }
 
 .state:active {
-    background: linear-gradient(rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 30%, rgba(0, 0, 0, 0.2), 50%, rgba(0, 0, 0, 0.1) 100%);
+	transition: 0.04s ease-in-out 0s;
+    background: linear-gradient(rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 30%, rgba(255, 255, 255, 0.2), 50%, rgba(255, 255, 255, 0.1) 100%);
+  	transform: translateY(-2px);
 }
 
 .trigger {
@@ -141,7 +167,9 @@ option {
 }
 
 .trigger:active {
-    background: linear-gradient(rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 30%, rgba(0, 0, 0, 0.2), 50%, rgba(0, 0, 0, 0.1) 100%);
+	transition: 0.04s ease-in-out 0s;
+    background: linear-gradient(rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 30%, rgba(255, 255, 255, 0.2), 50%, rgba(255, 255, 255, 0.1) 100%);
+  	transform: translateY(-2px);
 }
 
 #edges {
@@ -154,18 +182,18 @@ option {
 }
 
 #arrow path {
-    fill: greenyellow;
+    fill: var(--arrow);
 }
 
 .edge {
     fill: none;
-    stroke: greenyellow;
+    stroke: var(--arrow);
     stroke-width: 2;
     marker-end: url(#arrow);
 }
 
 .edge.draft {
-    stroke: green;
+    stroke: var(--arrow);
     stroke-dasharray: 5 4;
 }
 
@@ -178,31 +206,49 @@ option {
 }
 
 .edge-group:hover .edge {
-    stroke: green;
+    stroke: var(--arrow);
 }
 
 .edge-group.selected .edge {
-    stroke: green;
+    stroke: var(--arrow);
     stroke-width: 3;
 }
 
 .waypoint {
     stroke-width: 2;
-    fill: rgba(173, 255, 47, 0.2);
-    stroke: greenyellow;
+    fill: none;
+    stroke: var(--arrow);
     pointer-events: all;
 }
 
 .waypoint:hover {
-    fill: rgba(6, 111, 22, 0.45);
-    stroke: #066f16;
+    fill: #0004;
     stroke-dasharray: 5 4;
+	transition: 0.03s ease-in-out 0s;
 }
 
 .node {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: absolute;
-	text-align: center;
     z-index: 2;
+    height: 60px;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		translate: 0 -4px;
+	}
+    to {
+        opacity: 1;
+		translate: 0 0;
+    }
 }
 
 .node:active {
@@ -210,32 +256,39 @@ option {
 }
 
 .pulse {
-  animation: color-pulse 1.5s infinite ease-in-out;
+	animation: color-pulse 1.5s infinite ease-in-out;
 }
 
 @keyframes color-pulse {
-  0%, 100% {
-    background: grey;
-  }
-  50% {
-    background: black;
-  }
+	0%, 100% {
+		background: #33333333;
+	}
+	50% {
+		background: #FFFFFF33;
+	}
 }
 
 button {
 	border: 2px solid rgba(255, 255, 255, 0.45); border-radius: 29px;
 	background-color: #0f02270f;
+    white-space: pre-wrap;
+	font: inherit;
+	align-items: center;
+	line-height: 1;
 }
 
 input {
 	border: 2px solid rgba(255, 255, 255, 0.45); border-radius: 29px;
 	background-color: #0f02270f;
 	padding-left: 5px;
+	font: inherit;
 }
+
 select {
 	border: 2px solid rgba(255, 255, 255, 0.45); border-radius: 29px;
 	background-color: #0f02270f;
 	padding-left: 5px;
+	font: inherit;
 }
 
 .leftright {
@@ -246,6 +299,39 @@ select {
 }
 
 hr {
-	border: 3x solid white;
-	color: white;
+    border: none;
+    border-top: 5px double #FFFFFF33;
+    color: #FFFFFF33;
+    overflow: visible;
+    text-align: center;
+    height: 5px;
+}
+
+.glass {
+    position: relative;
+	box-shadow: 2px 2px 2px 2px #00000020;
+}
+
+.glass::after {
+    content: "";
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.4) 0%,
+            rgba(255, 255, 255, 0.12) 8%,
+            transparent 35%
+        ),
+        linear-gradient(
+            120deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.25) 45%,
+            rgba(255, 255, 255, 0.02) 55%,
+            transparent 70%
+        );
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    corner-shape: inherit;
+    border-width: inherit;
 }
