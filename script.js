@@ -19,7 +19,7 @@ function createRemoveButton(onRemove, label = "Remove") {
     const button = document.createElement("button");
     button.type = "button";
     button.style.background = "none";
-    button.style.aspectRatio = "1";
+    button.style.aspectRatio = "1.5";
     button.innerText = "\u00d7";
     button.title = label;
     button.setAttribute("aria-label", label);

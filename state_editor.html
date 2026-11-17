@@ -16,8 +16,7 @@
                     <div class="selection-body">
                         <div id="addState" class="state states glass">
                             <div class="leftright">Add State <button onclick="StateData.addState()" style="height: 24px">==></button></div>
-                            <div class="leftright">Name: <input id="stateName" type="text" style="height: 24px"placeholder="name"></div><hr />
-                            <div class="leftright">Add Additional Property: <button onclick="StateData.addStateProperty()" style="height: 24px">+</button></div>   
+                            <div class="leftright">Name: <input id="stateName" type="text" style="height: 24px"placeholder="name"></div>
                         </div>
                     </div>
                 </details>
@@ -44,8 +43,15 @@
                 </div>
             </div>
             <div class="side">
-                <details class="selection subsystems">
+                <details class="selection subsystems" id="subsystems">
                     <summary class="selection-summary glass">subsystems</summary>
+                    <div class="selection-body">
+                        <div id="addSubsystem" class="subsystem subsystems glass">
+                            <div class="leftright">Add Subsystem <button onclick="SubsystemData.addSubsystem()" style="height: 24px">==></button></div>
+                            <div class="leftright">Name: <input id="subsystemName" type="text" style="height: 24px" placeholder="name"></div>
+                            <div class="leftright">Add Additional Property: <button onclick="SubsystemData.addSubsystemProperty()" style="height: 24px">+</button></div>
+                        </div>
+                    </div>  
                 </details>
                 <details class="selection saves">
                     <summary class="selection-summary glass">saves</summary>
