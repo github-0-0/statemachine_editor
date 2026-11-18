@@ -12,14 +12,10 @@
         #888 0%,
         #ededed 100%);;
     --text: #00043c;
-    --states: #4a75e2;
+    --states: #537de8;
     --triggers: #eeb20e;
     --subsystems: #ec320d;
     --saves: #0bea2c;
-    --states-dull: #0d3ebb;
-    --triggers-dull: #c39412;
-    --subsystems-dull: #be2d10;
-    --saves-dull: #0bbe26;
     --arrow: green;
     color-scheme: light;
   	interpolate-size: allow-keywords;

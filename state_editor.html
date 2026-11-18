@@ -58,6 +58,83 @@
                 </details>
             </div>
         </div>
+        <template id="tpl-remove-button">
+            <button type="button" style="background: none; aspect-ratio: 1.5">&times;</button>
+        </template>
+
+        <!-- One "name: type" row in the add-property forms -->
+        <template id="tpl-property-row">
+            <div class="leftright">
+                <input placeholder="name" style="width: 30%; height: 24px">
+                <text>: </text>
+                <select style="height: 24px"></select>
+            </div>
+        </template>
+
+        <!-- One "==> key: [input] [x]" row inside a state/trigger card -->
+        <template id="tpl-attr-row">
+            <hr>
+            <text class="attr-row leftright"><input style="width: 30%; min-width: 0"></text>
+        </template>
+
+        <!-- Container for a state card's per-subsystem rows -->
+        <template id="tpl-subsystem-list">
+            <div class="subsystem-rows"></div>
+        </template>
+
+        <!-- "==> SUBSYSTEM: [substate dropdown]" row inside a state card -->
+        <template id="tpl-subsystem-row">
+            <hr>
+            <text class="attr-row leftright"><select style="width: 50%; min-width: 0; height: 24px"></select></text>
+        </template>
+
+        <!-- Sidebar card with a collapsible list of attributes -->
+        <template id="tpl-card-expandable">
+            <div class="selection-body">
+                <div class="card glass">
+                    <details>
+                        <summary class="leftright">
+                            <text class="card-name"></text>
+                            <button type="button" class="insert">==&gt;</button>
+                        </summary>
+                    </details>
+                </div>
+            </div>
+        </template>
+
+        <!-- Sidebar card with no attributes -->
+        <template id="tpl-card-simple">
+            <div class="selection-body">
+                <div class="card glass leftright">
+                    <text class="card-name"></text>
+                    <button type="button" class="insert">==&gt;</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- "Add substate" row at the top of a subsystem card -->
+        <template id="tpl-substate-add">
+            <div class="leftright">
+                <input class="substate-input" placeholder="substate name" style="width: 50%; height: 24px">
+                <button type="button" class="add-substate" style="height: 24px">+</button>
+            </div>
+            <hr>
+        </template>
+
+        <!-- One substate inside a subsystem card -->
+        <template id="tpl-substate">
+            <details class="substate">
+                <summary class="leftright">
+                    <text class="substate-name"></text>
+                </summary>
+            </details>
+        </template>
+
+        <!-- A node on the board -->
+        <template id="tpl-node">
+            <div style="position: absolute; z-index: 2; cursor: grab; user-select: none; touch-action: none; box-sizing: border-box"></div>
+        </template>
+
         <script src="script.js"></script>
     </body>
 </html>

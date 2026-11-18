@@ -1,4 +1,3 @@
-
 const scale = 20;
 const board = document.getElementById('board');
 const svg = document.getElementById('edges');
@@ -15,12 +14,13 @@ function registerGraphObject(object, prefix) {
     return id;
 }
 
+// Clones the contents of a <template> from the HTML (returns a DocumentFragment).
+function cloneTemplate(id) {
+    return document.getElementById(id).content.cloneNode(true);
+}
+
 function createRemoveButton(onRemove, label = "Remove") {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.style.background = "none";
-    button.style.aspectRatio = "1.5";
-    button.innerText = "\u00d7";
+    const button = cloneTemplate("tpl-remove-button").firstElementChild;
     button.title = label;
     button.setAttribute("aria-label", label);
     // button.appendChild(image); 
@@ -425,19 +425,10 @@ class Node {
     }
 
     createElement(className) {
-        this.el = document.createElement("div");
+        this.el = cloneTemplate("tpl-node").firstElementChild;
 
         this.el.className = className;
         this.el.innerText = this.name;
-
-        this.el.style.position = "absolute";
-        this.el.style.left = "";
-        this.el.style.top = "";
-        this.el.style.cursor = "grab";
-        this.el.style.userSelect = "none";
-        this.el.style.touchAction = "none";
-        this.el.style.zIndex = "2";
-        this.el.style.boxSizing = "border-box";
 
         const [x, y] = Node.randomPosition();
 
@@ -526,6 +517,7 @@ class Node {
 
 class StateData {
     static stateNames = new Set();
+    static instances = new Set();
     static stateBlocks = document.getElementById("states");
     static stateProps = [];
     static stateInputTypes = {
@@ -544,18 +536,9 @@ class StateData {
     }
 
     static addStateProperty() {
-        const container = document.createElement("div");
-        container.classList.add("leftright");
-
-        const name = document.createElement("input");
-        name.placeholder = "name";
-        name.style = "width: 30%; height: 24px";
-
-        const colon = document.createElement("text");
-        colon.innerText = ": ";
-
-        const select = document.createElement("select");
-        select.style = "height: 24px";
+        const container = cloneTemplate("tpl-property-row").firstElementChild;
+        const name = container.querySelector("input");
+        const select = container.querySelector("select");
 
         for (const type of Object.keys(StateData.stateInputTypes)) {
             const option = document.createElement("option");
@@ -571,10 +554,17 @@ class StateData {
             container.remove();
         }, "Remove property");
 
-        container.append(remove, name, colon, select);
+        container.prepend(remove);
 
         document.getElementById("addState").append(container);
         StateData.stateProps.push(prop);
+    }
+
+    // Re-renders every state's subsystem rows (call after subsystems/substates change).
+    static refreshAll() {
+        for (const state of StateData.instances) {
+            state.renderSubsystemRows();
+        }
     }
 
     static reset() {
@@ -599,22 +589,22 @@ class StateData {
         this.attrs = attrs;
         this.className = "state states node glass";
         this.nodeEl = null;
+        this.selectedSubstates = {};    // subsystem name -> substate name
+        this.subsystemList = null;
 
         this.createElement();
         StateData.stateNames.add(name);
+        StateData.instances.add(this);
     }
 
     createElement() {
-        const body = document.createElement("div");
-        body.className = "selection-body";
+        const body = cloneTemplate("tpl-card-expandable").firstElementChild;
         this.el = body;
 
-        const div = document.createElement("div");
-        div.className = "state states glass";
+        const div = body.querySelector(".card");
+        div.classList.add("state", "states");
 
-        const insert = document.createElement("button");
-        insert.type = "button";
-        insert.innerText = "==>";
+        const insert = body.querySelector(".insert");
         insert.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -627,46 +617,16 @@ class StateData {
             `Remove state ${this.name}`
         );
 
-        if (Object.keys(this.attrs).length !== 0) {
-            const details = document.createElement("details");
-            const summary = document.createElement("summary");
-            const name = document.createElement("text");
+        const details = body.querySelector("details");
+        const summary = body.querySelector("summary");
 
-            name.innerText = "> " + this.name;
-            summary.classList.add("leftright");
-            summary.append(remove, name, insert);
+        body.querySelector(".card-name").innerText = "> " + this.name;
+        summary.prepend(remove);
 
-            details.appendChild(summary);
-            div.appendChild(details);
+        this.subsystemList = cloneTemplate("tpl-subsystem-list").firstElementChild;
+        details.append(this.subsystemList);
+        this.renderSubsystemRows();
 
-            for (const [key, value] of Object.entries(this.attrs)) {
-                const p = document.createElement("text");
-                p.classList.add("leftright");
-                const hr = document.createElement("hr");
-                p.innerText = "==> " + key + ": ";
-
-                const input = document.createElement("input");
-                input.type = value;
-                input.style = "width: 30%; min-width: 0;";
-
-                p.append(input);
-
-                p.append(createRemoveButton(() => {
-                    delete this.attrs[key];
-                    p.remove();
-                }, `Remove property ${key}`));
-
-                details.append(hr, p);
-            }
-        } else {
-            const name = document.createElement("text");
-            name.innerText = this.name;
-
-            div.classList.add("leftright");
-            div.append(remove, name, insert);
-        }
-
-        body.appendChild(div);
         StateData.stateBlocks.append(body);
     }
 
@@ -677,6 +637,50 @@ class StateData {
 
         this.el.remove();
         StateData.stateNames.delete(this.name);
+        StateData.instances.delete(this);
+    }
+
+    // One dropdown per subsystem, listing that subsystem's substates.
+    renderSubsystemRows() {
+        this.subsystemList.replaceChildren();
+
+        // Forget selections for subsystems that no longer exist.
+        for (const name of Object.keys(this.selectedSubstates)) {
+            if (!SubsystemData.subsystems.has(name)) {
+                delete this.selectedSubstates[name];
+            }
+        }
+
+        for (const subsystem of SubsystemData.subsystems.values()) {
+            const fragment = cloneTemplate("tpl-subsystem-row");
+            const p = fragment.querySelector(".attr-row");
+            const select = p.querySelector("select");
+
+            select.append(new Option("(none)", ""));
+            for (const substate of subsystem.substates) {
+                select.append(new Option(substate.name, substate.name));
+            }
+
+            // Keep the previous choice if that substate still exists.
+            const selected = this.selectedSubstates[subsystem.name];
+            if (subsystem.substates.some(substate => substate.name === selected)) {
+                select.value = selected;
+            } else {
+                delete this.selectedSubstates[subsystem.name];
+            }
+
+            select.addEventListener("change", () => {
+                if (select.value === "") {
+                    delete this.selectedSubstates[subsystem.name];
+                } else {
+                    this.selectedSubstates[subsystem.name] = select.value;
+                }
+            });
+
+            p.prepend("==> " + subsystem.name + ": ");
+
+            this.subsystemList.append(fragment);
+        }
     }
 }
 
@@ -700,18 +704,9 @@ class TriggerData {
     }
 
     static addTriggerProperty() {
-        const container = document.createElement("div");
-        container.classList.add("leftright");
-
-        const name = document.createElement("input");
-        name.placeholder = "name";
-        name.style = "width: 30%; height: 24px";
-
-        const colon = document.createElement("text");
-        colon.innerText = ": ";
-
-        const select = document.createElement("select");
-        select.style = "height: 24px";
+        const container = cloneTemplate("tpl-property-row").firstElementChild;
+        const name = container.querySelector("input");
+        const select = container.querySelector("select");
 
         for (const type of Object.keys(TriggerData.triggerInputTypes)) {
             const option = document.createElement("option");
@@ -727,7 +722,7 @@ class TriggerData {
             container.remove();
         }, "Remove property");
 
-        container.append(remove, name, colon, select);
+        container.prepend(remove);
 
         document.getElementById("addTrigger").append(container);
         TriggerData.triggerProps.push(prop);
@@ -761,16 +756,16 @@ class TriggerData {
     }
 
     createElement() {
-        const body = document.createElement("div");
-        body.className = "selection-body";
+        const hasAttrs = Object.keys(this.attrs).length !== 0;
+        const body = cloneTemplate(
+            hasAttrs ? "tpl-card-expandable" : "tpl-card-simple"
+        ).firstElementChild;
         this.el = body;
 
-        const div = document.createElement("div");
-        div.className = "trigger triggers glass";
+        const div = body.querySelector(".card");
+        div.classList.add("trigger", "triggers");
 
-        const insert = document.createElement("button");
-        insert.type = "button";
-        insert.innerText = "==>";
+        const insert = body.querySelector(".insert");
         insert.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -783,47 +778,36 @@ class TriggerData {
             `Remove trigger ${this.name}`
         );
 
-        if (Object.keys(this.attrs).length !== 0) {
-            const details = document.createElement("details");
-            const summary = document.createElement("summary");
-            const name = document.createElement("text");
+        const nameEl = body.querySelector(".card-name");
 
-            name.innerText = "> " + this.name;
+        if (hasAttrs) {
+            const details = body.querySelector("details");
+            const summary = body.querySelector("summary");
 
-            summary.classList.add("leftright");
-            summary.append(remove, name, insert);
-
-            details.appendChild(summary);
-            div.appendChild(details);
+            nameEl.innerText = "> " + this.name;
+            summary.prepend(remove);
 
             for (const [key, value] of Object.entries(this.attrs)) {
-                const p = document.createElement("text");
-                p.classList.add("leftright");
-                const hr = document.createElement("hr");
-                p.innerText = "==> " + key + ": ";
+                const fragment = cloneTemplate("tpl-attr-row");
+                const p = fragment.querySelector(".attr-row");
+                const input = p.querySelector("input");
 
-                const input = document.createElement("input");
                 input.type = value;
-                input.style = "width: 30%; min-width: 0;";
 
-                p.append(input);
+                p.prepend("==> " + key + ": ");
 
                 p.append(createRemoveButton(() => {
                     delete this.attrs[key];
                     p.remove();
                 }, `Remove property ${key}`));
 
-                details.append(hr, p);
+                details.append(fragment);
             }
         } else {
-            const name = document.createElement("text");
-            name.innerText = this.name;
-
-            div.classList.add("leftright");
-            div.append(remove, name, insert);
+            nameEl.innerText = this.name;
+            div.prepend(remove);
         }
 
-        body.appendChild(div);
         TriggerData.triggerBlocks.append(body);
     }
 
@@ -837,6 +821,174 @@ class TriggerData {
     }
 }
 
+class SubsystemData {
+    static subsystems = new Map();    // name -> SubsystemData
+    static subsystemBlocks = document.getElementById("subsystems");
+    static subsystemProps = [];
+
+    static subsystemInputTypes = {
+        "Angle": "number",
+        "Angular Velocity": "number",
+        "Distance": "number",
+        "Linear Velocity": "number",
+    };
+
+    static addSubsystem() {
+        const attrs = Object.fromEntries(SubsystemData.subsystemProps.map(prop =>
+            [prop.name.value, SubsystemData.subsystemInputTypes[prop.type.value]]
+        ));
+
+        new SubsystemData(document.getElementById("subsystemName").value.toUpperCase(), attrs);
+        SubsystemData.reset();
+    }
+
+    static addSubsystemProperty() {
+        const container = cloneTemplate("tpl-property-row").firstElementChild;
+        const name = container.querySelector("input");
+        const select = container.querySelector("select");
+
+        for (const type of Object.keys(SubsystemData.subsystemInputTypes)) {
+            const option = document.createElement("option");
+            option.innerText = type;
+            select.append(option);
+        }
+
+        const prop = { name, type: select, container };
+
+        const remove = createRemoveButton(() => {
+            const index = SubsystemData.subsystemProps.indexOf(prop);
+            if (index !== -1) SubsystemData.subsystemProps.splice(index, 1);
+            container.remove();
+        }, "Remove property");
+
+        container.prepend(remove);
+
+        document.getElementById("addSubsystem").append(container);
+        SubsystemData.subsystemProps.push(prop);
+    }
+
+    static reset() {
+        document.getElementById("subsystemName").value = "";
+        for (const prop of SubsystemData.subsystemProps) {
+            prop.container.remove();
+        }
+        SubsystemData.subsystemProps = [];
+    }
+
+    constructor(name, attrs = {}) {
+        name = name.toUpperCase();
+        if (name === "") {
+            throw new Error("Can't have empty name");
+        }
+        if (SubsystemData.subsystems.has(name)) {
+            throw new Error("Name exists");
+        }
+
+        this.name = name;
+        this.type = "subsystem";
+        this.attrs = attrs;     // attribute name -> input type, shared by every substate
+        this.substates = [];    // { name, values, el }
+        this.details = null;
+
+        this.createElement();
+        SubsystemData.subsystems.set(name, this);
+        StateData.refreshAll();
+    }
+
+    createElement() {
+        const body = cloneTemplate("tpl-card-expandable").firstElementChild;
+        this.el = body;
+
+        const div = body.querySelector(".card");
+        div.classList.add("subsystem", "subsystems");
+
+        // Subsystems aren't placed on the board, so the insert button isn't needed.
+        body.querySelector(".insert").remove();
+
+        const remove = createRemoveButton(
+            () => this.remove(),
+            `Remove subsystem ${this.name}`
+        );
+
+        body.querySelector(".card-name").innerText = "> " + this.name;
+        body.querySelector("summary").prepend(remove);
+
+        this.details = body.querySelector("details");
+
+        const addRow = cloneTemplate("tpl-substate-add");
+        const nameInput = addRow.querySelector(".substate-input");
+
+        addRow.querySelector(".add-substate").onclick = () => {
+            this.addSubstate(nameInput.value);
+            nameInput.value = "";
+        };
+
+        this.details.append(addRow);
+
+        SubsystemData.subsystemBlocks.append(body);
+    }
+
+    addSubstate(name) {
+        name = name.toUpperCase();
+        if (name === "") {
+            throw new Error("Can't have empty name");
+        }
+        if (this.substates.some(substate => substate.name === name)) {
+            throw new Error("Name exists");
+        }
+
+        const substate = { name, values: {}, el: null };
+        this.substates.push(substate);
+        this.createSubstateElement(substate);
+        StateData.refreshAll();
+    }
+
+    createSubstateElement(substate) {
+        const details = cloneTemplate("tpl-substate").firstElementChild;
+        substate.el = details;
+
+        const remove = createRemoveButton(
+            () => this.removeSubstate(substate),
+            `Remove substate ${substate.name}`
+        );
+
+        details.querySelector(".substate-name").innerText = "> " + substate.name;
+        details.querySelector("summary").prepend(remove);
+
+        // One editable input per subsystem attribute.
+        for (const [key, type] of Object.entries(this.attrs)) {
+            const fragment = cloneTemplate("tpl-attr-row");
+            const p = fragment.querySelector(".attr-row");
+            const input = p.querySelector("input");
+
+            input.type = type;
+            substate.values[key] = input.value;
+            input.addEventListener("input", () => {
+                substate.values[key] = input.value;
+            });
+
+            p.prepend(key + ": ");
+
+            details.append(fragment);
+        }
+
+        this.details.append(details);
+    }
+
+    removeSubstate(substate) {
+        substate.el.remove();
+        this.substates.splice(this.substates.indexOf(substate), 1);
+        StateData.refreshAll();
+    }
+
+    remove() {
+        this.el.remove();
+        SubsystemData.subsystems.delete(this.name);
+        StateData.refreshAll();
+    }
+}
+
 new StateData("Default");
 new StateData("Example State");
 new TriggerData("Example Trigger");
+new SubsystemData("Example Subsystem", { "position": "number" });
